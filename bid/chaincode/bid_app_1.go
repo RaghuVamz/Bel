@@ -481,27 +481,14 @@ func ProcessQueryResult(stub shim.ChaincodeStubInterface, Avalbytes []byte, args
 	recType = dat["RecType"].(string)
 	switch recType {
 
-	/*case "ARTINV":
+	case "ITEM":
 
-	ar, err := JSONtoAR(Avalbytes) //
-	if err != nil {
-		fmt.Println("ProcessRequestType(): Cannot create itemObject \n")
+		ar, err := JSONtoAR(Avalbytes) //
+		if err != nil {
+			fmt.Println("ProcessRequestType(): Cannot create itemObject \n")
+			return err
+		}
 		return err
-	}
-	// Decrypt Image and Save Image in a file
-	image := Decrypt(ar.AES_Key, ar.ItemImage)
-	if err != nil {
-		fmt.Println("ProcessRequestType() : Image decrytion failed ")
-		return err
-	}
-	fmt.Println("ProcessRequestType() : Image conversion from byte[] to file successfull ")
-	err = ByteArrayToImage(image, ccPath+"copy."+ar.ItemPicFN)
-	if err != nil {
-
-		fmt.Println("ProcessRequestType() : Image conversion from byte[] to file failed ")
-		return err
-	}
-	return err*/
 
 	case "USER":
 		ur, err := JSONtoUser(Avalbytes) //
