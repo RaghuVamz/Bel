@@ -37,7 +37,7 @@ var recType = []string{"USER"}
 // The following array holds the list of tables that should be created
 // The deploy/init deletes the tables and recreates them every time a deploy is invoked
 //////////////////////////////////////////////////////////////////////////////////////////////////
-var aucTables = []string{"UserTable", "UserCatTable"}
+var aucTables = []string{"UserTable", "UserCatTable", "ItemTable", "ItemCatTable", "ItemHistoryTable"}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // This creates a record of the Asset (Inventory)
@@ -60,14 +60,22 @@ type UserObject struct {
 	RoutingNo string
 }
 
+type ItemObject struct {
+	ItemID      string
+	RecType     string
+	ItemDesc    string
+	ItemDetail  string // Could included details such as who created the Art work if item is a Painting
+	ItemType    string
+	ItemSubject string
+}
+
 func GetNumberOfKeys(tname string) int {
 	TableMap := map[string]int{
 		"UserTable":    1,
 		"UserCatTable": 3,
-		/*"ItemTable":        1,
-
-		"ItemCatTable":     3,
-		"AuctionTable":     1,
+		"ItemTable":    1,
+		"ItemCatTable": 3,
+		/*"AuctionTable":     1,
 		"AucInitTable":     2,
 		"AucOpenTable":     2,
 		"TransTable":       2,
@@ -85,7 +93,7 @@ func GetNumberOfKeys(tname string) int {
 //////////////////////////////////////////////////////////////
 func InvokeFunction(fname string) func(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	InvokeFunc := map[string]func(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error){
-		//"PostItem":           PostItem,
+		"PostItem": PostItem,
 		"PostUser": PostUser,
 		/*"PostAuctionRequest": PostAuctionRequest,
 		"PostTransaction":    PostTransaction,
@@ -563,4 +571,119 @@ func JSONtoUser(user []byte) (UserObject, error) {
 	}
 	fmt.Println("JSONtoUser created: ", ur)
 	return ur, err
+}
+
+func PostItem(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+
+	itemObject, err := CreateItemObject(args[0:])
+	if err != nil {
+		fmt.Println("PostItem(): Cannot create item object \n")
+		return nil, err
+	}
+
+	// Convert Item Object to JSON
+	buff, err := ARtoJSON(itemObject) //
+	if err != nil {
+		fmt.Println("PostItem() : Failed Cannot create object buffer for write : ", args[1])
+		return nil, errors.New("PostItem(): Failed Cannot create object buffer for write : " + args[1])
+	} else {
+		// Update the ledger with the Buffer Data
+		// err = stub.PutState(args[0], buff)
+		keys := []string{args[0]}
+		err = UpdateLedger(stub, "ItemTable", keys, buff)
+		if err != nil {
+			fmt.Println("PostItem() : write error while inserting record\n")
+			return buff, err
+		}
+
+		// Post Entry into ItemCatTable - i.e. Item Category Table
+		// The first key 2016 is a dummy (band aid) key to extract all values
+		keys = []string{"2016", args[6], args[0]}
+		err = UpdateLedger(stub, "ItemCatTable", keys, buff)
+		if err != nil {
+			fmt.Println("PostItem() : Write error while inserting record into ItemCatTable \n")
+			return buff, err
+		}
+
+	}
+	return buff, nil
+}
+
+func CreateItemObject(args []string) (ItemObject, error) {
+
+	var err error
+	var myItem ItemObject
+
+	// Check there are 12 Arguments provided as per the the struct - two are computed
+	if len(args) != 6 {
+		fmt.Println("CreateItemObject(): Incorrect number of arguments. Expecting 6 ")
+		return myItem, errors.New("CreateItemObject(): Incorrect number of arguments. Expecting 6 ")
+	}
+
+	// Validate ItemID is an integer
+
+	_, err = strconv.Atoi(args[0])
+	if err != nil {
+		fmt.Println("CreateItemObject(): Item ID should be an integer create failed! ")
+		return myItem, errors.New("createItemObject(): Item ID should be an integer create failed!")
+	}
+
+	// Append the AES Key, The Encrypted Image Byte Array and the file type
+	myItem = ItemObject{args[0], args[1], args[2], args[3], args[4], args[5]}
+
+	fmt.Println("CreateItemObject(): Item Object created: ID# ", myItem.ItemID)
+
+	// Code to Validate the Item Object)
+	// If User presents Crypto Key then key is used to validate the picture that is stored as part of the title
+	// TODO
+
+	return myItem, nil
+}
+
+func ARtoJSON(ar ItemObject) ([]byte, error) {
+
+	ajson, err := json.Marshal(ar)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	return ajson, nil
+}
+
+func GetItem(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+
+	var err error
+
+	// Get the Objects and Display it
+	Avalbytes, err := QueryLedger(stub, "ItemTable", args)
+	if err != nil {
+		fmt.Println("GetItem() : Failed to Query Object ")
+		jsonResp := "{\"Error\":\"Failed to get  Object Data for " + args[0] + "\"}"
+		return nil, errors.New(jsonResp)
+	}
+
+	if Avalbytes == nil {
+		fmt.Println("GetItem() : Incomplete Query Object ")
+		jsonResp := "{\"Error\":\"Incomplete information about the key for " + args[0] + "\"}"
+		return nil, errors.New(jsonResp)
+	}
+
+	fmt.Println("GetItem() : Response : Successfull ")
+
+	// Masking ItemImage binary data
+	itemObj, _ := JSONtoAR(Avalbytes)
+	Avalbytes, _ = ARtoJSON(itemObj)
+
+	return Avalbytes, nil
+}
+
+func JSONtoAR(data []byte) (ItemObject, error) {
+
+	ar := ItemObject{}
+	err := json.Unmarshal([]byte(data), &ar)
+	if err != nil {
+		fmt.Println("Unmarshal failed : ", err)
+	}
+
+	return ar, err
 }
