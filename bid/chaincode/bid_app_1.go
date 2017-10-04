@@ -37,7 +37,7 @@ var recType = []string{"USER"}
 // The following array holds the list of tables that should be created
 // The deploy/init deletes the tables and recreates them every time a deploy is invoked
 //////////////////////////////////////////////////////////////////////////////////////////////////
-var aucTables = []string{"UserTable"}
+var aucTables = []string{"UserTable", "UserCatTable"}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // This creates a record of the Asset (Inventory)
@@ -62,9 +62,10 @@ type UserObject struct {
 
 func GetNumberOfKeys(tname string) int {
 	TableMap := map[string]int{
-		"UserTable": 1,
+		"UserTable":    1,
+		"UserCatTable": 3,
 		/*"ItemTable":        1,
-		"UserCatTable":     3,
+
 		"ItemCatTable":     3,
 		"AuctionTable":     1,
 		"AucInitTable":     2,
