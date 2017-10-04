@@ -31,13 +31,13 @@ import (
 // which used a record type field. The array below holds a list of valid record types.
 // This could be stored on a blockchain table or an application
 //////////////////////////////////////////////////////////////////////////////////////////////////
-var recType = []string{"USER", "ITEM"}
+var recType = []string{"USER", "ITEM", "TENDER"}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // The following array holds the list of tables that should be created
 // The deploy/init deletes the tables and recreates them every time a deploy is invoked
 //////////////////////////////////////////////////////////////////////////////////////////////////
-var aucTables = []string{"UserTable", "ItemTable"}
+var aucTables = []string{"UserTable", "ItemTable", "TenderTable"}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // This creates a record of the Asset (Inventory)
@@ -69,10 +69,23 @@ type ItemObject struct {
 	ItemSubject string
 }
 
+type TenderRequest struct {
+	TenderID        string
+	RecType         string // TENDER
+	ItemID          string
+	InstitutionID   string // ID of the Institution managing the tender
+	TenderStartDate string // Date on which Auction Request was filed
+	TenderEndDate   string // reserver price > previous purchase price
+	TenderBidPrice  string // 0 (Zero) if not applicable else specify price
+	Status          string // INIT, OPEN, CLOSED (To be Updated by Trgger Auction)
+}
+
 func GetNumberOfKeys(tname string) int {
 	TableMap := map[string]int{
-		"UserTable": 1,
-		"ItemTable": 1,
+		"UserTable":   1,
+		"ItemTable":   1,
+		"TenderTable": 2,
+
 		/*"AuctionTable":     1,
 		"AucInitTable":     2,
 		"AucOpenTable":     2,
@@ -91,10 +104,10 @@ func GetNumberOfKeys(tname string) int {
 //////////////////////////////////////////////////////////////
 func InvokeFunction(fname string) func(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	InvokeFunc := map[string]func(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error){
-		"PostItem": PostItem,
-		"PostUser": PostUser,
-		/*"PostAuctionRequest": PostAuctionRequest,
-		"PostTransaction":    PostTransaction,
+		"PostItem":           PostItem,
+		"PostUser":           PostUser,
+		"PostAuctionRequest": PostAuctionRequest,
+		/*"PostTransaction":    PostTransaction,
 		"PostBid":            PostBid,
 		"OpenAuctionForBids": OpenAuctionForBids,
 		"BuyItNow":           BuyItNow,
@@ -111,10 +124,10 @@ func InvokeFunction(fname string) func(stub shim.ChaincodeStubInterface, functio
 //////////////////////////////////////////////////////////////
 func QueryFunction(fname string) func(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	QueryFunc := map[string]func(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error){
-		"GetItem": GetItem,
-		"GetUser": GetUser,
-		/*"GetAuctionRequest":     GetAuctionRequest,
-		"GetTransaction":        GetTransaction,
+		"GetItem":           GetItem,
+		"GetUser":           GetUser,
+		"GetAuctionRequest": GetAuctionRequest,
+		/*"GetTransaction":        GetTransaction,
 		"GetBid":                GetBid,
 		"GetLastBid":            GetLastBid,
 		"GetHighestBid":         GetHighestBid,
@@ -653,4 +666,181 @@ func JSONtoAR(data []byte) (ItemObject, error) {
 	}
 
 	return ar, err
+}
+
+func PostAuctionRequest(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+
+	ar, err := CreateAuctionRequest(args[0:])
+	if err != nil {
+		return nil, err
+	}
+
+	// Let us make sure that the Item is not on Auction
+
+	// Validate Auction House to check it is a registered User
+	aucHouse, err := ValidateMember(stub, ar.InstitutionID)
+	fmt.Println("Institution information  ", aucHouse, " ID: ", ar.InstitutionID)
+	if err != nil {
+		fmt.Println("PostAuctionRequest() : Failed Auction House not Registered in Blockchain ", ar.InstitutionID)
+		return nil, err
+	}
+
+	// Validate Item record
+	itemObject, err := ValidateItemSubmission(stub, ar.ItemID)
+	if err != nil {
+		fmt.Println("PostAuctionRequest() : Failed Could not Validate Item Object in Blockchain ", ar.ItemID)
+		return itemObject, err
+	}
+
+	// Convert AuctionRequest to JSON
+	buff, err := AucReqtoJSON(ar) // Converting the auction request struct to []byte array
+	if err != nil {
+		fmt.Println("PostAuctionRequest() : Failed Cannot create object buffer for write : ", args[1])
+		return nil, errors.New("PostAuctionRequest(): Failed Cannot create object buffer for write : " + args[1])
+	} else {
+		// Update the ledger with the Buffer Data
+		//err = stub.PutState(args[0], buff)
+		keys := []string{args[0]}
+		err = UpdateLedger(stub, "TenderTable", keys, buff)
+		if err != nil {
+			fmt.Println("PostAuctionRequest() : write error while inserting record\n")
+			return buff, err
+		}
+
+		//An entry is made in the AuctionInitTable that this Item has been placed for Auction
+		// The UI can pull all items available for auction and the item can be Opened for accepting bids
+		// The 2016 is a dummy key and has notr value other than to get all rows
+
+		keys = []string{"2016", args[0]}
+		err = UpdateLedger(stub, "TenderTable", keys, buff)
+		if err != nil {
+			fmt.Println("PostAuctionRequest() : write error while inserting record into AucInitTable \n")
+			return buff, err
+		}
+
+	}
+
+	return buff, err
+}
+
+func CreateAuctionRequest(args []string) (TenderRequest, error) {
+	var err error
+	var aucReg TenderRequest
+
+	// Check there are 8 Arguments
+	// See example -- The Open and Close Dates are Dummy, and will be set by open auction
+	// '{"Function": "PostAuctionRequest", "Args":["1111", "TENDER", "1000", "2016-05-20 11:00:00.3 +0000 UTC","2016-05-23 11:00:00.3 +0000 UTC", 100 , INIT]}'
+	if len(args) != 8 {
+		fmt.Println("CreateAuctionRegistrationObject(): Incorrect number of arguments. Expecting 8 ")
+		return aucReg, errors.New("CreateAuctionRegistrationObject() : Incorrect number of arguments. Expecting 8 ")
+	}
+
+	// Validate UserID is an integer . I think this redundant and can be avoided
+
+	// err = validateID(args[0])
+	if err != nil {
+		return aucReg, errors.New("CreateAuctionRequest() : User ID should be an integer")
+	}
+
+	aucReg = TenderRequest{args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]}
+	fmt.Println("CreateAuctionObject() : Auction Registration : ", aucReg)
+
+	return aucReg, nil
+}
+
+////////////////////////////////////////////////////////////////////////////
+// Validate if the User Information Exists
+// in the block-chain
+////////////////////////////////////////////////////////////////////////////
+func ValidateMember(stub shim.ChaincodeStubInterface, owner string) ([]byte, error) {
+
+	// Get the Item Objects and Display it
+	// Avalbytes, err := stub.GetState(owner)
+	args := []string{owner, "USER"}
+	Avalbytes, err := QueryLedger(stub, "UserTable", args)
+
+	if err != nil {
+		fmt.Println("ValidateMember() : Failed - Cannot find valid owner record for ART  ", owner)
+		jsonResp := "{\"Error\":\"Failed to get Owner Object Data for " + owner + "\"}"
+		return nil, errors.New(jsonResp)
+	}
+
+	if Avalbytes == nil {
+		fmt.Println("ValidateMember() : Failed - Incomplete owner record for ART  ", owner)
+		jsonResp := "{\"Error\":\"Failed - Incomplete information about the owner for " + owner + "\"}"
+		return nil, errors.New(jsonResp)
+	}
+
+	fmt.Println("ValidateMember() : Validated Item Owner:\n", owner)
+	return Avalbytes, nil
+}
+
+func ValidateItemSubmission(stub shim.ChaincodeStubInterface, artId string) ([]byte, error) {
+
+	// Get the Item Objects and Display it
+	args := []string{artId, "ARTINV"}
+	Avalbytes, err := QueryLedger(stub, "ItemTable", args)
+	if err != nil {
+		fmt.Println("ValidateItemSubmission() : Failed - Cannot find valid owner record for ART  ", artId)
+		jsonResp := "{\"Error\":\"Failed to get Owner Object Data for " + artId + "\"}"
+		return nil, errors.New(jsonResp)
+	}
+
+	if Avalbytes == nil {
+		fmt.Println("ValidateItemSubmission() : Failed - Incomplete owner record for ART  ", artId)
+		jsonResp := "{\"Error\":\"Failed - Incomplete information about the owner for " + artId + "\"}"
+		return nil, errors.New(jsonResp)
+	}
+
+	//fmt.Println("ValidateItemSubmission() : Validated Item Owner:", Avalbytes)
+	return Avalbytes, nil
+}
+
+//////////////////////////////////////////////////////////
+// Converts an Auction Request to a JSON String
+//////////////////////////////////////////////////////////
+func AucReqtoJSON(ar TenderRequest) ([]byte, error) {
+
+	ajson, err := json.Marshal(ar)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	return ajson, nil
+}
+
+//////////////////////////////////////////////////////////
+// Converts an User Object to a JSON String
+//////////////////////////////////////////////////////////
+func JSONtoAucReq(areq []byte) (TenderRequest, error) {
+
+	ar := TenderRequest{}
+	err := json.Unmarshal(areq, &ar)
+	if err != nil {
+		fmt.Println("JSONtoAucReq error: ", err)
+		return ar, err
+	}
+	return ar, err
+}
+
+func GetAuctionRequest(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+
+	var err error
+
+	// Get the Objects and Display it
+	Avalbytes, err := QueryLedger(stub, "TenderTable", args)
+	if err != nil {
+		fmt.Println("GetAuctionRequest() : Failed to Query Object ")
+		jsonResp := "{\"Error\":\"Failed to get  Object Data for " + args[0] + "\"}"
+		return nil, errors.New(jsonResp)
+	}
+
+	if Avalbytes == nil {
+		fmt.Println("GetAuctionRequest() : Incomplete Query Object ")
+		jsonResp := "{\"Error\":\"Incomplete information about the key for " + args[0] + "\"}"
+		return nil, errors.New(jsonResp)
+	}
+
+	fmt.Println("GetAuctionRequest() : Response : Successfull - \n")
+	return Avalbytes, nil
 }
