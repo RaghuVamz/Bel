@@ -37,7 +37,7 @@ var recType = []string{"USER", "ITEM"}
 // The following array holds the list of tables that should be created
 // The deploy/init deletes the tables and recreates them every time a deploy is invoked
 //////////////////////////////////////////////////////////////////////////////////////////////////
-var aucTables = []string{"UserTable", "UserCatTable", "ItemTable", "ItemCatTable"}
+var aucTables = []string{"UserTable", "ItemTable"}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // This creates a record of the Asset (Inventory)
@@ -71,10 +71,8 @@ type ItemObject struct {
 
 func GetNumberOfKeys(tname string) int {
 	TableMap := map[string]int{
-		"UserTable":    1,
-		"UserCatTable": 3,
-		"ItemTable":    1,
-		"ItemCatTable": 3,
+		"UserTable": 1,
+		"ItemTable": 1,
 		/*"AuctionTable":     1,
 		"AucInitTable":     2,
 		"AucOpenTable":     2,
@@ -339,14 +337,6 @@ func PostUser(stub shim.ChaincodeStubInterface, function string, args []string) 
 		err = UpdateLedger(stub, "UserTable", keys, buff)
 		if err != nil {
 			fmt.Println("PostUser() : write error while inserting record")
-			return nil, err
-		}
-
-		// Post Entry into UserCatTable - i.e. User Category Table
-		keys = []string{"2016", args[3], args[0]}
-		err = UpdateLedger(stub, "UserCatTable", keys, buff)
-		if err != nil {
-			fmt.Println("PostUser() : write error while inserting recordinto UserCatTable \n")
 			return nil, err
 		}
 	}
