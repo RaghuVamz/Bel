@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
@@ -154,6 +155,17 @@ func main() {
 	if err != nil {
 		fmt.Printf("Error starting Simple chaincode: %s", err)
 	}
+	doEvery(50*time.Millisecond, helloworld)
+}
+
+func doEvery(d time.Duration, f func(time.Time)) {
+	for x := range time.Tick(d) {
+		f(x)
+	}
+}
+
+func helloworld(t time.Time) {
+	fmt.Printf("%v: Hello, World!\n", t)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -695,8 +707,8 @@ func PostAuctionRequest(stub shim.ChaincodeStubInterface, function string, args 
 	// Convert AuctionRequest to JSON
 	buff, err := AucReqtoJSON(ar) // Converting the auction request struct to []byte array
 	if err != nil {
-		fmt.Println("PostAuctionRequest() : Failed Cannot create object buffer for write : ", args[1])
-		return nil, errors.New("PostAuctionRequest(): Failed Cannot create object buffer for write : " + args[1])
+		fmt.Println("PostAuctionRequest() : Failed Cannot create object buffer for write : ", args[0])
+		return nil, errors.New("PostAuctionRequest(): Failed Cannot create object buffer for write : " + args[0])
 	} else {
 		// Update the ledger with the Buffer Data
 		//err = stub.PutState(args[0], buff)
@@ -705,6 +717,7 @@ func PostAuctionRequest(stub shim.ChaincodeStubInterface, function string, args 
 		// The 2016 is a dummy key and has notr value other than to get all rows
 
 		keys := []string{args[0]}
+		fmt.Println("PostAuctionRequest() : TenderId published is : ", args[0])
 		err = UpdateLedger(stub, "TenderTable", keys, buff)
 		if err != nil {
 			fmt.Println("PostAuctionRequest() : write error while inserting record into AucInitTable \n")
