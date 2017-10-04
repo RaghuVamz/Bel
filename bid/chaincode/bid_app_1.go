@@ -84,7 +84,7 @@ func GetNumberOfKeys(tname string) int {
 	TableMap := map[string]int{
 		"UserTable":   1,
 		"ItemTable":   1,
-		"TenderTable": 2,
+		"TenderTable": 1,
 
 		/*"AuctionTable":     1,
 		"AucInitTable":     2,
@@ -704,7 +704,7 @@ func PostAuctionRequest(stub shim.ChaincodeStubInterface, function string, args 
 		// The UI can pull all items available for auction and the item can be Opened for accepting bids
 		// The 2016 is a dummy key and has notr value other than to get all rows
 
-		keys := []string{"2016", args[0]}
+		keys := []string{args[0]}
 		err = UpdateLedger(stub, "TenderTable", keys, buff)
 		if err != nil {
 			fmt.Println("PostAuctionRequest() : write error while inserting record into AucInitTable \n")
