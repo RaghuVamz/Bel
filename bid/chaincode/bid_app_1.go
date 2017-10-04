@@ -595,16 +595,6 @@ func PostItem(stub shim.ChaincodeStubInterface, function string, args []string) 
 			fmt.Println("PostItem() : write error while inserting record\n")
 			return buff, err
 		}
-
-		// Post Entry into ItemCatTable - i.e. Item Category Table
-		// The first key 2016 is a dummy (band aid) key to extract all values
-		keys = []string{"2016", args[6], args[0]}
-		err = UpdateLedger(stub, "ItemCatTable", keys, buff)
-		if err != nil {
-			fmt.Println("PostItem() : Write error while inserting record into ItemCatTable \n")
-			return buff, err
-		}
-
 	}
 	return buff, nil
 }
