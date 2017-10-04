@@ -31,7 +31,7 @@ import (
 // which used a record type field. The array below holds a list of valid record types.
 // This could be stored on a blockchain table or an application
 //////////////////////////////////////////////////////////////////////////////////////////////////
-var recType = []string{"USER"}
+var recType = []string{"USER", "ITEM"}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // The following array holds the list of tables that should be created
@@ -113,7 +113,7 @@ func InvokeFunction(fname string) func(stub shim.ChaincodeStubInterface, functio
 //////////////////////////////////////////////////////////////
 func QueryFunction(fname string) func(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	QueryFunc := map[string]func(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error){
-		//"GetItem":               GetItem,
+		"GetItem": GetItem,
 		"GetUser": GetUser,
 		/*"GetAuctionRequest":     GetAuctionRequest,
 		"GetTransaction":        GetTransaction,
