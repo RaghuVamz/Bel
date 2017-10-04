@@ -700,18 +700,11 @@ func PostAuctionRequest(stub shim.ChaincodeStubInterface, function string, args 
 	} else {
 		// Update the ledger with the Buffer Data
 		//err = stub.PutState(args[0], buff)
-		keys := []string{args[0]}
-		err = UpdateLedger(stub, "TenderTable", keys, buff)
-		if err != nil {
-			fmt.Println("PostAuctionRequest() : write error while inserting record\n")
-			return buff, err
-		}
-
 		//An entry is made in the AuctionInitTable that this Item has been placed for Auction
 		// The UI can pull all items available for auction and the item can be Opened for accepting bids
 		// The 2016 is a dummy key and has notr value other than to get all rows
 
-		keys = []string{"2016", args[0]}
+		keys := []string{"2016", args[0]}
 		err = UpdateLedger(stub, "TenderTable", keys, buff)
 		if err != nil {
 			fmt.Println("PostAuctionRequest() : write error while inserting record into AucInitTable \n")
