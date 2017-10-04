@@ -485,7 +485,7 @@ func ProcessQueryResult(stub shim.ChaincodeStubInterface, Avalbytes []byte, args
 
 		ar, err := JSONtoAR(Avalbytes) //
 		if err != nil {
-			fmt.Println("ProcessRequestType(): Cannot create itemObject \n")
+			fmt.Println("ProcessRequestType(): Cannot create itemObject \n", ar)
 			return err
 		}
 		return err
