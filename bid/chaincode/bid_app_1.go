@@ -37,7 +37,7 @@ var recType = []string{"USER"}
 // The following array holds the list of tables that should be created
 // The deploy/init deletes the tables and recreates them every time a deploy is invoked
 //////////////////////////////////////////////////////////////////////////////////////////////////
-var aucTables = []string{"UserTable", "UserCatTable", "ItemTable", "ItemCatTable", "ItemHistoryTable"}
+var aucTables = []string{"UserTable", "UserCatTable", "ItemTable", "ItemCatTable"}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // This creates a record of the Asset (Inventory)
