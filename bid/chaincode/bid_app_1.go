@@ -465,7 +465,7 @@ func QueryLedger(stub shim.ChaincodeStubInterface, tableName string, args []stri
 	fmt.Println("QueryLedger() : Successful - Proceeding to ProcessRequestType ")
 	err = ProcessQueryResult(stub, Avalbytes, args)
 	if err != nil {
-		fmt.Println("QueryLedger() : Cannot create object  : ", args[1])
+		fmt.Println("QueryLedger() : Cannot create object  : ", args[0])
 		jsonResp := "{\"QueryLedger() Error\":\" Cannot create Object for key " + args[0] + "\"}"
 		return nil, errors.New(jsonResp)
 	}
